@@ -46,29 +46,29 @@ keep_cols = [
 
 readm = readmissions_df[keep_cols].copy()
 numeric_cols = keep_cols[4:]
+
+# Convert numeric columns
 readm[numeric_cols] = readm[numeric_cols].apply(pd.to_numeric, errors='coerce')
 readm = readm.dropna(subset=['Excess Readmission Ratio'])
 
-# Pivot readmissions
+# Pivot the data
 readm_pivot = readm.pivot_table(
     index=['Facility ID', 'Facility Name', 'State'],
     columns='Measure Name',
-    values=numeric_cols
-)
+    values=numeric_cols,
+    aggfunc='mean'
+).reset_index()
 
-# Flatten multi-index columns safely
-readm_pivot.columns = [
-    f"{metric.replace(' ', '_')}_{str(measure).replace('-', '').replace(' ', '')}"
-    for metric, measure in readm_pivot.columns
-]
-readm_pivot = readm_pivot.reset_index()
+# Flatten MultiIndex columns
+if isinstance(readm_pivot.columns, pd.MultiIndex):
+    readm_pivot.columns = [
+        '_'.join([str(i).strip().replace(' ', '_') for i in col if i]) 
+        for col in readm_pivot.columns
+    ]
 
-# Standardize key columns
-readm_pivot.rename(columns={
-    'Facility ID': 'Facility ID',
-    'Facility Name': 'Facility Name',
-    'State': 'State'
-}, inplace=True)
+# Rename facility ID column back to consistent name
+if 'Facility_ID_' in readm_pivot.columns:
+    readm_pivot.rename(columns={'Facility_ID_': 'Facility ID'}, inplace=True)
 
 readm_pivot['Facility ID'] = readm_pivot['Facility ID'].astype(str)
 
@@ -86,10 +86,12 @@ inf_pivot = inf.pivot_table(
     aggfunc='mean'
 ).reset_index()
 
+# Flatten columns
+if isinstance(inf_pivot.columns, pd.MultiIndex):
+    inf_pivot.columns = ['_'.join([str(i).strip() for i in col if i]) for col in inf_pivot.columns]
+
 inf_pivot.columns = [
-    f"Infection_{c.replace(' ', '_').replace('/', '_')}"
-    if c != 'Facility ID' else c
-    for c in inf_pivot.columns
+    f"Infection_{c}" if c != 'Facility ID' else c for c in inf_pivot.columns
 ]
 
 inf_pivot['Facility ID'] = inf_pivot['Facility ID'].astype(str)
@@ -114,12 +116,12 @@ adi = adi_df.rename(columns={
 })
 
 adi['ZIP'] = adi['ZIP'].astype(str).str.zfill(5)
-adi[['ADI_National_Rank', 'ADI_State_Rank']] = adi[
-    ['ADI_National_Rank', 'ADI_State_Rank']
-].apply(pd.to_numeric, errors='coerce')
+adi[['ADI_National_Rank', 'ADI_State_Rank']] = adi[['ADI_National_Rank', 'ADI_State_Rank']].apply(pd.to_numeric, errors='coerce')
 adi = adi.dropna()
+
 adi_agg = adi.groupby('ZIP', as_index=False).mean()
 
+# Map facility to ZIP
 facility_zip = infections_df[['Facility ID', 'ZIP Code']].drop_duplicates()
 facility_zip['Facility ID'] = facility_zip['Facility ID'].astype(str)
 facility_zip['ZIP Code'] = facility_zip['ZIP Code'].astype(str).str.zfill(5)
@@ -150,15 +152,11 @@ merged = merged.dropna(subset=['Composite_Readmission_Score'])
 # Modeling Dataset
 # -----------------------------
 leak_cols = [c for c in merged.columns if "Predicted_Readmission" in c or "Expected_Readmission" in c]
-
-# Dynamically detect ID columns (avoid hardcoding)
-id_cols = [c for c in merged.columns if c.lower() in ['facility id', 'facility name', 'state', 'zip code']]
-
+id_cols = [c for c in merged.columns if c.startswith('Facility') or c.startswith('State')]
 count_cols = [c for c in merged.columns if c.startswith("Number_of_Readmissions")]
 
 X = merged.drop(columns=leak_cols + id_cols + count_cols + ['Composite_Readmission_Score'])
 y = merged['Composite_Readmission_Score']
-
 X = X.fillna(X.mean())
 
 # -----------------------------
@@ -172,11 +170,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 # Models
 # -----------------------------
 lr = LinearRegression().fit(X_train, y_train)
-rf = RandomForestRegressor(
-    n_estimators=200,
-    random_state=42,
-    n_jobs=-1
-).fit(X_train, y_train)
+rf = RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1).fit(X_train, y_train)
 
 # -----------------------------
 # Evaluation
@@ -193,9 +187,7 @@ print("Random Forest:", evaluate(rf, X_test, y_test))
 # -----------------------------
 # Cross Validation
 # -----------------------------
-cv_rmse = np.sqrt(-cross_val_score(
-    rf, X, y, cv=5, scoring="neg_mean_squared_error"
-))
+cv_rmse = np.sqrt(-cross_val_score(rf, X, y, cv=5, scoring="neg_mean_squared_error"))
 print("CV RMSE Mean:", cv_rmse.mean())
 
 # -----------------------------
