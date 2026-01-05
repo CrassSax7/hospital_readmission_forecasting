@@ -1,7 +1,3 @@
-# ============================================
-# Hospital Readmissions Prediction (Direct CSV)
-# ============================================
-
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, cross_val_score
@@ -23,33 +19,47 @@ OUTPUT_DIR = BASE_DIR / "outputs"
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-FINAL_MERGED_PATH = DATA_DIR / "final_merged_dataset.csv"
+MERGED_CSV_PATH = DATA_DIR / "final_merged_dataset.csv"
 
 # -----------------------------
-# Load merged dataset
+# Load merged CSV
 # -----------------------------
-merged = pd.read_csv(FINAL_MERGED_PATH)
+merged = pd.read_csv(MERGED_CSV_PATH)
+
+# Ensure column names are stripped of whitespace
+merged.columns = merged.columns.str.strip()
+
+# Check required columns exist
+required_cols = ['Facility ID', 'Composite_Readmission_Score']
+for col in required_cols:
+    if col not in merged.columns:
+        raise ValueError(f"Required column '{col}' not found in CSV!")
 
 # -----------------------------
-# Prepare features and target
+# Modeling dataset
 # -----------------------------
-# Use all columns except ID/target/leak columns
-leak_cols = [c for c in merged.columns if "Predicted_Readmission" in c or "Expected_Readmission" in c]
-id_cols = ['Facility ID', 'Facility Name', 'State']
 target_col = 'Composite_Readmission_Score'
 
-X = merged.drop(columns=leak_cols + id_cols + [target_col], errors='ignore')
+# Drop columns not used for modeling (IDs, counts, etc.)
+id_cols = ['Facility ID', 'Facility Name', 'State']
+leak_cols = [c for c in merged.columns if 'Predicted_Readmission' in c or 'Expected_Readmission' in c]
+count_cols = [c for c in merged.columns if c.startswith('Number_of_Readmissions')]
+
+X = merged.drop(columns=id_cols + leak_cols + count_cols + [target_col], errors='ignore')
 y = merged[target_col]
 
+# Fill missing numeric values
 X = X.fillna(X.mean())
 
 # -----------------------------
-# Train/Test Split
+# Train/Test split
 # -----------------------------
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
 
 # -----------------------------
-# Models
+# Train models
 # -----------------------------
 lr = LinearRegression().fit(X_train, y_train)
 rf = RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1).fit(X_train, y_train)
@@ -67,13 +77,15 @@ print("Linear Regression:", evaluate(lr, X_test, y_test))
 print("Random Forest:", evaluate(rf, X_test, y_test))
 
 # -----------------------------
-# Cross Validation
+# Cross-validation
 # -----------------------------
-cv_rmse = np.sqrt(-cross_val_score(rf, X, y, cv=5, scoring="neg_mean_squared_error"))
+cv_rmse = np.sqrt(-cross_val_score(
+    rf, X, y, cv=5, scoring='neg_mean_squared_error'
+))
 print("CV RMSE Mean:", cv_rmse.mean())
 
 # -----------------------------
-# Save Artifacts
+# Save artifacts
 # -----------------------------
 with open(MODEL_DIR / "random_forest_model.pkl", "wb") as f:
     pickle.dump(rf, f)
