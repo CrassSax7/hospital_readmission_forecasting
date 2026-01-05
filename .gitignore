@@ -1,18 +1,36 @@
 # Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 *.pyc
 
-# Jupyter
+# Virtual environments
+venv/
+env/
+*.env
+.venv/
+
+# Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
-# OS files
+# System files
 .DS_Store
 Thumbs.db
 
-# Environment / secrets
-.env
+# Data & outputs
+/data/
+*.csv
+*.xlsx
+*.zip
+
+# Models & artifacts
+/models/
+*.pkl
+*.joblib
+
+# Token or secrets
 token.txt
 
-# Model artifacts (comment out if you want tracked)
-models/*.pkl
-
+# Logs
+*.log
