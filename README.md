@@ -1,32 +1,37 @@
-# Hospital Readmissions Prediction
+# Hospital Readmissions Forecasting
 
-This repository contains a **hospital readmissions forecasting pipeline**. The pipeline uses hospital readmission and infection data to predict a **Composite Readmission Score** for hospitals, leveraging Linear Regression and Random Forest models.
+## Overview
+This repository predicts hospital readmission rates using CMS data and the Area Deprivation Index (ADI). The pipeline includes:
 
-## Project Structure
+1. **Data Preparation**: Cleans and merges hospital readmissions, infection, and ADI datasets into a single, consistent dataset (`final_merged_dataset.csv`).
+2. **Model Training**: Trains Linear Regression and Random Forest models on the pre-cleaned dataset.
+
+## Repo Structure
 
 hospital_readmission_forecasting/
-│
-├── data/ # Raw CSV data files (not included)
-├── models/ # Saved trained models and feature artifacts
-├── outputs/ # Final merged datasets, logs, evaluation outputs
-├── src/
-│ └── train_readmissions_model.py # Main pipeline script
-├── requirements.txt
-├── .gitignore
-└── README.md
+├─ data/ # Raw CSV files
+├─ outputs/ # Preprocessed CSVs
+├─ models/ # Saved model artifacts
+├─ src/ # Scripts
+│ ├─ prepare_data.py # Cleans & merges data
+│ └─ train_readmissions_model.py # Trains models
+├─ requirements.txt
+├─ .gitignore
+└─ README.md
 
 
 ## Installation
 
-1. Clone the repository:
-
 ```bash
-git clone https://github.com/<your-username>/hospital_readmission_forecasting.git
+# Clone repo
+git clone <repo-url>
 cd hospital_readmission_forecasting
+
+# Optional: create virtual environment
 python -m venv venv
-source venv/bin/activate  # Linux/macOS
-venv\Scripts\activate     # Windows
+source venv/bin/activate   # Mac/Linux
+venv\Scripts\activate      # Windows
+
+# Install dependencies
 pip install -r requirements.txt
-cd src
-python train_readmissions_model.py
 
