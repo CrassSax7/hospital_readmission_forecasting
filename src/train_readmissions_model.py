@@ -1,6 +1,5 @@
 # ============================================
-# Hospital Readmissions Model Training
-# Using pre-cleaned final_merged_dataset.csv
+# Hospital Readmissions Prediction (Direct CSV)
 # ============================================
 
 import pandas as pd
@@ -14,63 +13,46 @@ import os
 from pathlib import Path
 
 # -----------------------------
-# Paths (Relative for GitHub)
+# Paths
 # -----------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "outputs"  # final_merged_dataset.csv is stored here
+DATA_DIR = BASE_DIR / "data"
 MODEL_DIR = BASE_DIR / "models"
+OUTPUT_DIR = BASE_DIR / "outputs"
 
 os.makedirs(MODEL_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-MERGED_CSV_PATH = DATA_DIR / "final_merged_dataset.csv"
-
-# -----------------------------
-# Load pre-cleaned dataset
-# -----------------------------
-merged = pd.read_csv(MERGED_CSV_PATH)
+FINAL_MERGED_PATH = DATA_DIR / "final_merged_dataset.csv"
 
 # -----------------------------
-# Ensure 'Facility ID' is string
+# Load merged dataset
 # -----------------------------
-if 'Facility ID' not in merged.columns:
-    raise KeyError("'Facility ID' column is missing from final_merged_dataset.csv")
-merged['Facility ID'] = merged['Facility ID'].astype(str)
+merged = pd.read_csv(FINAL_MERGED_PATH)
 
 # -----------------------------
-# Target Engineering
+# Prepare features and target
 # -----------------------------
-excess_cols = [c for c in merged.columns if c.startswith("Excess_Readmission_Ratio")]
-merged['Composite_Readmission_Score'] = merged[excess_cols].mean(axis=1)
-merged = merged.dropna(subset=['Composite_Readmission_Score'])
-
-# -----------------------------
-# Prepare Modeling Dataset
-# -----------------------------
+# Use all columns except ID/target/leak columns
 leak_cols = [c for c in merged.columns if "Predicted_Readmission" in c or "Expected_Readmission" in c]
 id_cols = ['Facility ID', 'Facility Name', 'State']
-count_cols = [c for c in merged.columns if c.startswith("Number_of_Readmissions")]
+target_col = 'Composite_Readmission_Score'
 
-X = merged.drop(columns=leak_cols + id_cols + count_cols + ['Composite_Readmission_Score'])
-y = merged['Composite_Readmission_Score']
+X = merged.drop(columns=leak_cols + id_cols + [target_col], errors='ignore')
+y = merged[target_col]
 
 X = X.fillna(X.mean())
 
 # -----------------------------
 # Train/Test Split
 # -----------------------------
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # -----------------------------
 # Models
 # -----------------------------
 lr = LinearRegression().fit(X_train, y_train)
-rf = RandomForestRegressor(
-    n_estimators=200,
-    random_state=42,
-    n_jobs=-1
-).fit(X_train, y_train)
+rf = RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1).fit(X_train, y_train)
 
 # -----------------------------
 # Evaluation
@@ -87,9 +69,7 @@ print("Random Forest:", evaluate(rf, X_test, y_test))
 # -----------------------------
 # Cross Validation
 # -----------------------------
-cv_rmse = np.sqrt(-cross_val_score(
-    rf, X, y, cv=5, scoring="neg_mean_squared_error"
-))
+cv_rmse = np.sqrt(-cross_val_score(rf, X, y, cv=5, scoring="neg_mean_squared_error"))
 print("CV RMSE Mean:", cv_rmse.mean())
 
 # -----------------------------
@@ -101,4 +81,4 @@ with open(MODEL_DIR / "random_forest_model.pkl", "wb") as f:
 with open(MODEL_DIR / "feature_names.pkl", "wb") as f:
     pickle.dump(list(X.columns), f)
 
-print("Model training completed. Artifacts saved in 'models/' directory.")
+merged.to_csv(OUTPUT_DIR / "final_modeling_dataset.csv", index=False)
