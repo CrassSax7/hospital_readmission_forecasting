@@ -35,3 +35,5 @@ venv\Scripts\activate      # Windows
 # Install dependencies
 pip install -r requirements.txt
 
+python src/prepare_data.py
+python src/train_readmissions_model.py
