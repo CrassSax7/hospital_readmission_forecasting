@@ -28,6 +28,37 @@ INFECTIONS_PATH = DATA_DIR / "Healthcare_Associated_Infections-Hospital.csv"
 ADI_PATH = DATA_DIR / "CO_2023_ADI_9 Digit Zip Code_v4_0_1.csv"
 
 # -----------------------------
+# Column Normalization Function
+# -----------------------------
+def normalize_columns(df):
+    """
+    Flatten MultiIndex columns, replace spaces and special characters, 
+    and ensure key columns are properly named.
+    """
+    # Flatten MultiIndex if exists
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [
+            "_".join([str(i) for i in col if i]).replace(" ", "_").replace("-", "")
+            for col in df.columns
+        ]
+    else:
+        df.columns = [c.replace(" ", "_").replace("-", "") for c in df.columns]
+
+    # Ensure 'Facility ID', 'Facility Name', 'State' exist
+    mapping = {}
+    for key in ['Facility_ID', 'Facility_Name', 'State']:
+        matches = [c for c in df.columns if c.lower().replace("_","") == key.lower().replace("_","")]
+        if matches:
+            mapping[matches[0]] = key.replace("_", " ")
+    if mapping:
+        df.rename(columns=mapping, inplace=True)
+
+    # Force 'Facility ID' as string
+    if 'Facility ID' in df.columns:
+        df['Facility ID'] = df['Facility ID'].astype(str)
+    return df
+
+# -----------------------------
 # Load Data
 # -----------------------------
 readmissions_df = pd.read_csv(READMISSIONS_PATH)
@@ -45,13 +76,11 @@ keep_cols = [
 ]
 
 readm = readmissions_df[keep_cols].copy()
-
-# Ensure numeric columns are numeric
 numeric_cols = keep_cols[4:]
+
 readm[numeric_cols] = readm[numeric_cols].apply(pd.to_numeric, errors='coerce')
 readm = readm.dropna(subset=['Excess Readmission Ratio'])
 
-# Pivot and flatten safely
 readm_pivot = readm.pivot_table(
     index=['Facility ID', 'Facility Name', 'State'],
     columns='Measure Name',
@@ -59,20 +88,7 @@ readm_pivot = readm.pivot_table(
     aggfunc='mean'
 ).reset_index()
 
-# Flatten MultiIndex columns
-readm_pivot.columns = [
-    '_'.join([str(i) for i in col if i]).replace(' ', '_').replace('-', '')
-    for col in readm_pivot.columns
-]
-
-# Ensure key columns exist
-for col in ['Facility_ID', 'Facility_Name', 'State']:
-    if col in readm_pivot.columns:
-        new_col = col.replace('_', ' ')
-        readm_pivot.rename(columns={col: new_col}, inplace=True)
-
-# Convert Facility ID to string
-readm_pivot['Facility ID'] = readm_pivot['Facility ID'].astype(str)
+readm_pivot = normalize_columns(readm_pivot)
 
 # -----------------------------
 # Clean Infection Data
@@ -88,22 +104,19 @@ inf_pivot = inf.pivot_table(
     aggfunc='mean'
 ).reset_index()
 
-# Flatten MultiIndex
-inf_pivot.columns = [
-    '_'.join([str(i) for i in col if i]).replace(' ', '_').replace('/', '_')
-    for col in inf_pivot.columns
-]
-
-# Ensure Facility ID column exists
-if 'Facility_ID' in inf_pivot.columns:
-    inf_pivot.rename(columns={'Facility_ID': 'Facility ID'}, inplace=True)
-
-inf_pivot['Facility ID'] = inf_pivot['Facility ID'].astype(str)
+inf_pivot = normalize_columns(inf_pivot)
 
 # -----------------------------
 # Merge Readmissions + Infections
 # -----------------------------
-merged = pd.merge(readm_pivot, inf_pivot, on='Facility ID', how='left')
+merged = pd.merge(
+    readm_pivot,
+    inf_pivot,
+    on='Facility ID',
+    how='left'
+)
+
+merged = normalize_columns(merged)
 
 # -----------------------------
 # ADI Processing
@@ -115,12 +128,12 @@ adi = adi_df.rename(columns={
 })
 
 adi['ZIP'] = adi['ZIP'].astype(str).str.zfill(5)
-adi[['ADI_National_Rank', 'ADI_State_Rank']] = adi[['ADI_National_Rank', 'ADI_State_Rank']].apply(pd.to_numeric, errors='coerce')
+adi[['ADI_National_Rank', 'ADI_State_Rank']] = adi[
+    ['ADI_National_Rank', 'ADI_State_Rank']
+].apply(pd.to_numeric, errors='coerce')
 adi = adi.dropna()
-
 adi_agg = adi.groupby('ZIP', as_index=False).mean()
 
-# Map facilities to ZIP and ADI
 facility_zip = infections_df[['Facility ID', 'ZIP Code']].drop_duplicates()
 facility_zip['Facility ID'] = facility_zip['Facility ID'].astype(str)
 facility_zip['ZIP Code'] = facility_zip['ZIP Code'].astype(str).str.zfill(5)
@@ -139,6 +152,8 @@ merged = pd.merge(
     on='Facility ID',
     how='left'
 )
+
+merged = normalize_columns(merged)
 
 # -----------------------------
 # Target Engineering
