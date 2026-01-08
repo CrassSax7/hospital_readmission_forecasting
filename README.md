@@ -1,29 +1,76 @@
-# Hospital Readmissions Forecasting
+# 🏥 Hospital Readmission Forecasting
 
-## Overview
-This repository predicts hospital readmission rates using CMS data and the Area Deprivation Index (ADI). The pipeline includes:
+**Author:** J. Casey Brookshier  
+**Last Updated:** July 2025  
 
-1. **Data Preparation**: Cleans and merges hospital readmissions, infection, and ADI datasets into a single, consistent dataset (`final_merged_dataset.csv`).
-2. **Model Training**: Trains Linear Regression and Random Forest models on the pre-cleaned dataset.
+## 📌 Project Overview
 
-## Repo Structure
+This project builds an end-to-end, reproducible machine learning pipeline to predict hospital readmission risk using publicly available CMS quality metrics, healthcare-associated infection data, and socioeconomic deprivation indicators (Area Deprivation Index, ADI).
+
+The goal is to help healthcare administrators and policy analysts identify facilities at higher risk of readmission penalties and target interventions more effectively.
+
+---
+
+## 🎯 Objective
+
+To develop a predictive model for hospital-level readmission performance by:
+
+- Cleaning and standardizing multiple CMS datasets
+- Integrating clinical quality, infection control, and socioeconomic risk factors
+- Engineering a composite readmission risk score
+- Comparing linear and tree-based regression models
+- Producing deployable model artifacts
+
+---
+
+## 📊 Data Sources
+
+All data are publicly available:
+
+- **CMS Hospital Readmissions Reduction Program (FY2025)**  
+  Hospital-level readmission metrics by clinical condition
+
+- **Healthcare-Associated Infections – Hospital**  
+  Facility-level infection control performance indicators
+
+- **Area Deprivation Index (ADI)**  
+  ZIP-code–level socioeconomic disadvantage metrics
+
+> Raw data files are stored in `/data`.  
+> The analytic dataset is generated programmatically.
+
+---
+
+## 🧱 Project Structure
 
 hospital_readmission_forecasting/
-├─ data/ # Raw CSV files
-├─ outputs/ # Preprocessed CSVs
-├─ models/ # Saved model artifacts
-├─ src/ # Scripts
-│ ├─ prepare_data.py # Cleans & merges data
-│ └─ train_readmissions_model.py # Trains models
-├─ requirements.txt
-├─ .gitignore
-└─ README.md
+│
+├── data/
+│ ├── FY_2025_Hospital_Readmissions_Reduction_Program_Hospital.csv
+│ ├── Healthcare_Associated_Infections-Hospital.csv
+│ ├── CO_2023_ADI_9 Digit Zip Code_v4_0_1.csv
+│ └── hospital_readmissions_analytic_table.csv # auto-generated
+│
+├── artifacts/
+│ ├── random_forest_model.pkl
+│ ├── feature_names.pkl
+│ └── imputer.pkl
+│
+├── src/
+│ ├── prepare_data.py
+│ └── train_readmissions_model.py
+│
+├── requirements.txt
+└── README.md
 
-
-
-## How to Run
-
-```bash
+---
+# 1️⃣ Install dependencies
 pip install -r requirements.txt
+
+# 2️⃣ Build analytic dataset
 python src/prepare_data.py
+
+# 3️⃣ Train and evaluate models
 python src/train_readmissions_model.py
+
+
