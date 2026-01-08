@@ -1,96 +1,133 @@
+# ============================================================
+# train_readmissions_model.py
+# ============================================================
+# Purpose:
+#   Train and evaluate readmission risk models using the
+#   prepared analytic dataset.
+# ============================================================
+
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
-import pickle
-import os
 from pathlib import Path
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.impute import SimpleImputer
+import pickle
 
-# -----------------------------
-# Paths
-# -----------------------------
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-MODEL_DIR = BASE_DIR / "models"
-OUTPUT_DIR = BASE_DIR / "outputs"
+# ============================================================
+# PATHS
+# ============================================================
 
-os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = PROJECT_ROOT / "data"
+ARTIFACT_DIR = PROJECT_ROOT / "artifacts"
 
-MERGED_CSV_PATH = DATA_DIR / "final_merged_dataset.csv"
+DATA_FILE = DATA_DIR / "hospital_readmissions_analytic_table.csv"
 
-# -----------------------------
-# Load merged CSV
-# -----------------------------
-merged = pd.read_csv(MERGED_CSV_PATH)
+# ============================================================
+# LOAD DATA
+# ============================================================
 
-# Ensure column names are stripped of whitespace
-merged.columns = merged.columns.str.strip()
+df = pd.read_csv(DATA_FILE)
 
-# Check required columns exist
-required_cols = ['Facility ID', 'Composite_Readmission_Score']
-for col in required_cols:
-    if col not in merged.columns:
-        raise ValueError(f"Required column '{col}' not found in CSV!")
+REQUIRED_COLUMNS = {
+    "Facility ID",
+    "Facility Name",
+    "State",
+    "composite_readmission_score",
+}
 
-# -----------------------------
-# Modeling dataset
-# -----------------------------
-target_col = 'Composite_Readmission_Score'
+missing = REQUIRED_COLUMNS - set(df.columns)
+if missing:
+    raise ValueError(f"Required column(s) missing: {missing}")
 
-# Drop columns not used for modeling (IDs, counts, etc.)
-id_cols = ['Facility ID', 'Facility Name', 'State']
-leak_cols = [c for c in merged.columns if 'Predicted_Readmission' in c or 'Expected_Readmission' in c]
-count_cols = [c for c in merged.columns if c.startswith('Number_of_Readmissions')]
+print(f"✅ Loaded dataset: {df.shape}")
 
-X = merged.drop(columns=id_cols + leak_cols + count_cols + [target_col], errors='ignore')
-y = merged[target_col]
+# ============================================================
+# MODEL PREP
+# ============================================================
 
-# Fill missing numeric values
-X = X.fillna(X.mean())
+TARGET = "composite_readmission_score"
 
-# -----------------------------
-# Train/Test split
-# -----------------------------
+X = df.drop(columns=[
+    "Facility ID",
+    "Facility Name",
+    "State",
+    TARGET,
+])
+
+y = df[TARGET]
+
+X = X.dropna(axis=1, how="all")
+
+imputer = SimpleImputer(strategy="mean")
+X = pd.DataFrame(
+    imputer.fit_transform(X),
+    columns=X.columns,
+    index=X.index,
+)
+
+# ============================================================
+# TRAIN / TEST
+# ============================================================
+
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# -----------------------------
-# Train models
-# -----------------------------
-lr = LinearRegression().fit(X_train, y_train)
-rf = RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1).fit(X_train, y_train)
+lr = LinearRegression()
+lr.fit(X_train, y_train)
 
-# -----------------------------
-# Evaluation
-# -----------------------------
-def evaluate(model, X_test, y_test):
-    pred = model.predict(X_test)
-    rmse = np.sqrt(mean_squared_error(y_test, pred))
-    r2 = r2_score(y_test, pred)
-    return rmse, r2
+rf = RandomForestRegressor(
+    n_estimators=100,
+    random_state=42,
+    n_jobs=-1,
+)
+rf.fit(X_train, y_train)
 
-print("Linear Regression:", evaluate(lr, X_test, y_test))
-print("Random Forest:", evaluate(rf, X_test, y_test))
+# ============================================================
+# EVALUATION
+# ============================================================
 
-# -----------------------------
-# Cross-validation
-# -----------------------------
-cv_rmse = np.sqrt(-cross_val_score(
-    rf, X, y, cv=5, scoring='neg_mean_squared_error'
-))
-print("CV RMSE Mean:", cv_rmse.mean())
+def evaluate(model):
+    preds = model.predict(X_test)
+    return {
+        "RMSE": np.sqrt(mean_squared_error(y_test, preds)),
+        "R2": r2_score(y_test, preds),
+    }
 
-# -----------------------------
-# Save artifacts
-# -----------------------------
-with open(MODEL_DIR / "random_forest_model.pkl", "wb") as f:
+print("\n📊 Model Performance")
+print("Linear Regression:", evaluate(lr))
+print("Random Forest:", evaluate(rf))
+
+cv_rmse = np.sqrt(
+    -cross_val_score(
+        rf,
+        X,
+        y,
+        cv=5,
+        scoring="neg_mean_squared_error",
+    )
+)
+
+print("\n📈 Random Forest CV RMSE")
+print("Mean:", round(cv_rmse.mean(), 4), "Std:", round(cv_rmse.std(), 4))
+
+# ============================================================
+# SAVE ARTIFACTS
+# ============================================================
+
+ARTIFACT_DIR.mkdir(exist_ok=True)
+
+with open(ARTIFACT_DIR / "random_forest_model.pkl", "wb") as f:
     pickle.dump(rf, f)
 
-with open(MODEL_DIR / "feature_names.pkl", "wb") as f:
+with open(ARTIFACT_DIR / "feature_names.pkl", "wb") as f:
     pickle.dump(list(X.columns), f)
 
-merged.to_csv(OUTPUT_DIR / "final_modeling_dataset.csv", index=False)
+with open(ARTIFACT_DIR / "imputer.pkl", "wb") as f:
+    pickle.dump(imputer, f)
+
+print("\n✅ Model artifacts saved")

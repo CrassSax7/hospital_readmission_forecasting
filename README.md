@@ -20,20 +20,10 @@ hospital_readmission_forecasting/
 └─ README.md
 
 
-## Installation
+
+## How to Run
 
 ```bash
-# Clone repo
-git clone <repo-url>
-cd hospital_readmission_forecasting
-
-# Optional: create virtual environment
-python -m venv venv
-source venv/bin/activate   # Mac/Linux
-venv\Scripts\activate      # Windows
-
-# Install dependencies
 pip install -r requirements.txt
-
 python src/prepare_data.py
 python src/train_readmissions_model.py
