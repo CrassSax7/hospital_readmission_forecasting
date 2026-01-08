@@ -62,8 +62,8 @@ hospital_readmission_forecasting/
 │
 ├── requirements.txt
 └── README.md
+# 🔁 How to Run
 
----
 # 1️⃣ Install dependencies
 pip install -r requirements.txt
 
@@ -73,4 +73,6 @@ python src/prepare_data.py
 # 3️⃣ Train and evaluate models
 python src/train_readmissions_model.py
 
-
+# ✅ Outputs:
+# - data/hospital_readmissions_analytic_table.csv (cleaned, merged dataset)
+# - artifacts/ (trained model, feature names, and imputer)
