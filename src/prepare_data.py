@@ -1,49 +1,59 @@
 # ============================================================
-# prepare_data.py
+# Hospital Readmission Forecasting – Data Preparation Script
 # ============================================================
-# Purpose:
-#   Build a single analytic dataset for hospital readmission
-#   modeling from raw CMS + ADI data.
-#
-# Output:
-#   data/hospital_readmissions_analytic_table.csv
+# Author: J. Casey Brookshier
+# Purpose: Build analytic dataset for readmission modeling
+# Inputs: Raw CMS Readmissions, Infections, ADI files
+# Output: hospital_readmissions_analytic_table.csv
 # ============================================================
 
 import pandas as pd
+import numpy as np
 from pathlib import Path
 
 # ============================================================
-# PATHS (RELATIVE, GITHUB-SAFE)
+# CONFIG (RELATIVE PATHS)
 # ============================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 DATA_DIR = PROJECT_ROOT / "data"
+OUTPUT_FILE = DATA_DIR / "hospital_readmissions_analytic_table.csv"
 
 READMISSIONS_FILE = DATA_DIR / "FY_2025_Hospital_Readmissions_Reduction_Program_Hospital.csv"
 INFECTIONS_FILE   = DATA_DIR / "Healthcare_Associated_Infections-Hospital.csv"
 ADI_FILE          = DATA_DIR / "CO_2023_ADI_9 Digit Zip Code_v4_0_1.csv"
 
-OUTPUT_FILE = DATA_DIR / "hospital_readmissions_analytic_table.csv"
+READMISSION_METRICS = [
+    "Excess Readmission Ratio",
+    "Predicted Readmission Rate",
+    "Expected Readmission Rate",
+]
+
+print("🔧 Rebuilding analytic dataset from raw sources")
 
 # ============================================================
 # LOAD DATA
 # ============================================================
 
-readm = pd.read_csv(READMISSIONS_FILE)
-infect = pd.read_csv(INFECTIONS_FILE)
-adi = pd.read_csv(ADI_FILE)
+readm_df = pd.read_csv(READMISSIONS_FILE)
+infect_df = pd.read_csv(INFECTIONS_FILE)
+adi_df    = pd.read_csv(ADI_FILE)
 
 # ============================================================
-# CANONICAL KEYS
+# CANONICAL KEY NORMALIZATION
 # ============================================================
 
-readm["Facility ID"] = readm["Facility ID"].astype(str)
-infect["Facility ID"] = infect["Facility ID"].astype(str)
-infect["ZIP Code"] = infect["ZIP Code"].astype(str).str.zfill(5)
+readm_df["Facility ID"] = readm_df["Facility ID"].astype(str)
+infect_df["Facility ID"] = infect_df["Facility ID"].astype(str)
+
+infect_df["ZIP Code"] = infect_df["ZIP Code"].astype(str).str.zfill(5)
 
 # ============================================================
-# CLEAN READMISSIONS (LONG → WIDE)
+# CLEAN READMISSIONS DATA
 # ============================================================
+
+readm = readm_df.copy()
 
 readm["measure_code"] = (
     readm["Measure Name"]
@@ -52,27 +62,31 @@ readm["measure_code"] = (
     .str.lower()
 )
 
-readm["Excess Readmission Ratio"] = pd.to_numeric(
-    readm["Excess Readmission Ratio"], errors="coerce"
-)
+for col in READMISSION_METRICS:
+    readm[col] = pd.to_numeric(readm[col], errors="coerce")
 
 readm = readm.dropna(subset=["Excess Readmission Ratio"])
 
 readm_pivot = readm.pivot_table(
     index=["Facility ID", "Facility Name", "State"],
     columns="measure_code",
-    values="Excess Readmission Ratio",
+    values=READMISSION_METRICS
 )
 
-# 🔑 CRITICAL FIX: restore index columns
+readm_pivot.columns = [
+    f"{metric.replace(' ', '_').lower()}__{measure}"
+    for metric, measure in readm_pivot.columns
+]
+
 readm_pivot = readm_pivot.reset_index()
 
-assert "Facility ID" in readm_pivot.columns, \
-    "Facility ID missing after pivot"
+assert "Facility ID" in readm_pivot.columns, "Facility ID missing after pivot"
 
 # ============================================================
-# CLEAN INFECTIONS
+# CLEAN INFECTIONS DATA
 # ============================================================
+
+infect = infect_df.copy()
 
 infect["Score"] = pd.to_numeric(infect["Score"], errors="coerce")
 infect = infect.dropna(subset=["Score"])
@@ -87,36 +101,31 @@ infect_pivot = infect.pivot_table(
     index="Facility ID",
     columns="measure_clean",
     values="Score",
-    aggfunc="mean",
-).reset_index()
+    aggfunc="mean"
+).add_prefix("infection__")
 
-infect_pivot = infect_pivot.add_prefix("infection__")
-infect_pivot = infect_pivot.rename(
-    columns={"infection__Facility ID": "Facility ID"}
-)
+infect_pivot = infect_pivot.reset_index()
+
 # ============================================================
-# CLEAN ADI (BULLETPROOF VERSION)
+# CLEAN ADI DATA (BULLETPROOF)
 # ============================================================
 
-adi = adi.rename(columns={
+adi = adi_df.rename(columns={
     "ZIP_4": "zip",
     "ADI_NATRANK": "adi_national",
     "ADI_STATERNK": "adi_state",
 })
 
-# Keep only required columns (prevents hidden dtype pollution)
+# Keep only required columns to avoid dtype pollution
 adi = adi[["zip", "adi_national", "adi_state"]]
 
 adi["zip"] = adi["zip"].astype(str).str.zfill(5)
 
-# Force numeric conversion explicitly
 adi["adi_national"] = pd.to_numeric(adi["adi_national"], errors="coerce")
 adi["adi_state"] = pd.to_numeric(adi["adi_state"], errors="coerce")
 
-# Drop rows with missing ADI
 adi = adi.dropna(subset=["adi_national", "adi_state"])
 
-# 🔒 ENSURE NUMERIC TYPES (this line matters)
 adi = adi.astype({
     "adi_national": "float64",
     "adi_state": "float64",
@@ -127,8 +136,33 @@ adi_zip = (
        .mean(numeric_only=True)
 )
 
+assert adi_zip[["adi_national", "adi_state"]].apply(
+    lambda s: np.issubdtype(s.dtype, np.number)
+).all(), "ADI aggregation produced non-numeric output"
+
 # ============================================================
-# FINAL MERGE
+# FACILITY → ZIP → ADI BRIDGE
+# ============================================================
+
+facility_zip = (
+    infect_df[["Facility ID", "ZIP Code"]]
+    .drop_duplicates()
+    .rename(columns={"ZIP Code": "zip"})
+)
+
+facility_zip["Facility ID"] = facility_zip["Facility ID"].astype(str)
+facility_zip["zip"] = facility_zip["zip"].astype(str).str.zfill(5)
+
+facility_adi = facility_zip.merge(
+    adi_zip,
+    on="zip",
+    how="left"
+)
+
+assert "Facility ID" in facility_adi.columns, "Facility ID missing in facility_adi"
+
+# ============================================================
+# FINAL ANALYTIC TABLE
 # ============================================================
 
 final_df = (
@@ -142,20 +176,18 @@ final_df = (
 )
 
 # ============================================================
-# TARGET VARIABLE (CANONICAL NAME)
+# TARGET CONSTRUCTION
 # ============================================================
 
-readmission_cols = [
+excess_cols = [
     c for c in final_df.columns
-    if c not in ["Facility ID", "Facility Name", "State"]
-    and not c.startswith("infection__")
-    and c not in ["adi_national", "adi_state"]
+    if c.startswith("excess_readmission_ratio__")
 ]
 
-final_df["composite_readmission_score"] = final_df[readmission_cols].mean(axis=1)
+final_df["composite_readmission_score"] = final_df[excess_cols].mean(axis=1)
 
 # ============================================================
-# SCHEMA VALIDATION
+# FINAL VALIDATION
 # ============================================================
 
 REQUIRED_COLUMNS = {
@@ -167,12 +199,13 @@ REQUIRED_COLUMNS = {
 
 missing = REQUIRED_COLUMNS - set(final_df.columns)
 if missing:
-    raise ValueError(f"Missing required columns: {missing}")
+    raise ValueError(f"Missing required columns in final dataset: {missing}")
 
 # ============================================================
-# SAVE
+# SAVE OUTPUT
 # ============================================================
 
 final_df.to_csv(OUTPUT_FILE, index=False)
-print(f"✅ Analytic dataset written to {OUTPUT_FILE}")
-print("Shape:", final_df.shape)
+
+print(f"✅ Analytic dataset saved: {OUTPUT_FILE.resolve()}")
+print(f"📦 Final shape: {final_df.shape}")
