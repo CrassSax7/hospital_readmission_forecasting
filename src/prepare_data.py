@@ -94,9 +94,8 @@ infect_pivot = infect_pivot.add_prefix("infection__")
 infect_pivot = infect_pivot.rename(
     columns={"infection__Facility ID": "Facility ID"}
 )
-
 # ============================================================
-# CLEAN ADI (ZIP+4 → ZIP)
+# CLEAN ADI (BULLETPROOF VERSION)
 # ============================================================
 
 adi = adi.rename(columns={
@@ -105,25 +104,27 @@ adi = adi.rename(columns={
     "ADI_STATERNK": "adi_state",
 })
 
+# Keep only required columns (prevents hidden dtype pollution)
+adi = adi[["zip", "adi_national", "adi_state"]]
+
 adi["zip"] = adi["zip"].astype(str).str.zfill(5)
 
+# Force numeric conversion explicitly
+adi["adi_national"] = pd.to_numeric(adi["adi_national"], errors="coerce")
+adi["adi_state"] = pd.to_numeric(adi["adi_state"], errors="coerce")
+
+# Drop rows with missing ADI
 adi = adi.dropna(subset=["adi_national", "adi_state"])
+
+# 🔒 ENSURE NUMERIC TYPES (this line matters)
+adi = adi.astype({
+    "adi_national": "float64",
+    "adi_state": "float64",
+})
 
 adi_zip = (
     adi.groupby("zip", as_index=False)
-       .agg({"adi_national": "mean", "adi_state": "mean"})
-)
-
-facility_zip = (
-    infect[["Facility ID", "ZIP Code"]]
-    .drop_duplicates()
-    .rename(columns={"ZIP Code": "zip"})
-)
-
-facility_adi = facility_zip.merge(
-    adi_zip,
-    on="zip",
-    how="left"
+       .mean(numeric_only=True)
 )
 
 # ============================================================
