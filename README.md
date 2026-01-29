@@ -68,10 +68,8 @@ hospital_readmission_forecasting/
 git clone git@github.com:CrassSax7/hospital_readmissions_forecasting.git
 cd hospital_readmissions_forecasting
 
-# Install required Python packages
 pip install -r requirements.txt
 
-# Run the scripts
 python src/prepare_data.py
 python src/train_readmissions_model.py
 
