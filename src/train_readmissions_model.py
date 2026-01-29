@@ -26,7 +26,7 @@ import pickle
 # (relative paths for location independent functionality)
 # ============================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # define where input data is and where trained models saved
 DATA_DIR = PROJECT_ROOT / "data"
 ARTIFACT_DIR = PROJECT_ROOT / "artifacts"
