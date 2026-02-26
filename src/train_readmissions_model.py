@@ -21,11 +21,8 @@ from sklearn.impute import SimpleImputer
 # serialize python objects to disk
 import pickle
 
-# ============================================================
 # PATHS -> # find project root dynamically 
 # (relative paths for location independent functionality)
-# ============================================================
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # define where input data is and where trained models saved
 DATA_DIR = PROJECT_ROOT / "data"
@@ -33,10 +30,7 @@ ARTIFACT_DIR = PROJECT_ROOT / "artifacts"
 # define path to dataset created by prev script
 DATA_FILE = DATA_DIR / "hospital_readmissions_analytic_table.csv"
 
-# ============================================================
 # LOAD DATA -> load merged data set into df
-# ============================================================
-
 df = pd.read_csv(DATA_FILE)
 
 # define relevant columns for effective modeling
@@ -53,10 +47,7 @@ if missing:
 
 print(f"✅ Loaded dataset: {df.shape}")
 
-# ============================================================
 # MODEL PREP -> define prediction target (dependent variable)
-# ============================================================
-
 TARGET = "composite_readmission_score"
 
 # create feature matrix x, minus non-pred identifiers, target
@@ -83,9 +74,7 @@ X = pd.DataFrame(
     index=X.index,
 )
 
-# ============================================================
 # TRAIN / TEST -> 80/20 train/test split
-# ============================================================
 
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
@@ -103,11 +92,8 @@ rf = RandomForestRegressor(
 )
 rf.fit(X_train, y_train) #train random forest
 
-# ============================================================
 # EVALUATION -> function to predict on test data
 # compute RMSE, R^2, return metrics as dictionary
-# ============================================================
-
 def evaluate(model):
     preds = model.predict(X_test)
     return {
@@ -135,11 +121,11 @@ cv_rmse = np.sqrt(
 print("\n📈 Random Forest CV RMSE")
 print("Mean:", round(cv_rmse.mean(), 4), "Std:", round(cv_rmse.std(), 4))
 
-# ============================================================
+
 # SAVE ARTIFACTS -> create artifacts/dir if it doesn't exist
 # save trained RF mod, feature names, fitted imputer for 
 # consistent missing values
-# ============================================================
+
 
 ARTIFACT_DIR.mkdir(exist_ok=True)
 
