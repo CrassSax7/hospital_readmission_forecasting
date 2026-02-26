@@ -63,14 +63,44 @@ hospital_readmission_forecasting/
 ├── requirements.txt
 └── README.md
 
-## How to Run
-```bash
-git clone git@github.com:CrassSax7/hospital_readmission_forecasting.git
-cd hospital_readmission_forecasting
-pip install -r requirements.txt
-python src/prepare_data.py
-python src/train_readmissions_model.py
+---
 
+## 🚀 How to Run (Mac)
+
+```bash
+git clone https://github.com/CrassSax7/hospital_readmission_forecasting.git
+cd hospital_readmission_forecasting
+
+python3 -m venv venv
+source venv/bin/activate
+
+
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+python src/prepare_data.py
+
+python src/train_readmissions_model.py
+```
+
+---
+
+## 🚀 How to Run (Windows)
+
+```bash
+git clone https://github.com/CrassSax7/hospital_readmission_forecasting.git
+cd hospital_readmission_forecasting
+
+python -m venv venv
+venv\Scripts\activate
+
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+python src\prepare_data.py
+
+python src\train_readmissions_model.py
+```
 
 
 
