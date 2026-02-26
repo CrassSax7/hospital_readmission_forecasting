@@ -41,6 +41,55 @@ All data are publicly available:
 
 ---
 
+---
+
+## 📊 Key Findings
+
+### 🔧 Data Engineering
+- Rebuilt analytic dataset from raw hospital data sources  
+- Final dataset shape: **2,862 rows × 60 features**  
+- Cleaned, merged, and validated structured healthcare data  
+
+---
+
+### 🤖 Model Performance
+
+| Model              | RMSE   | R² Score |
+|--------------------|--------|----------|
+| Linear Regression  | 0.0253 | 0.7936   |
+| Random Forest      | 0.0147 | 0.9299   |
+
+---
+
+### 🌲 Random Forest Cross-Validation
+
+- **Mean CV RMSE:** 0.0193  
+- **Standard Deviation:** 0.0043  
+
+✔ Random Forest substantially outperformed Linear Regression  
+✔ Strong predictive accuracy (R² ≈ 0.93)  
+✔ Low cross-validation variance → model is stable and generalizable  
+
+---
+
+### 📦 Outputs Generated
+
+- Clean analytic dataset  
+- Trained model artifacts  
+- Performance metrics  
+- Saved prediction outputs  
+
+---
+
+### 💡 Business Interpretation
+
+- Ensemble models significantly improve readmission prediction accuracy  
+- Model stability suggests strong real-world deployment potential  
+- Feature-rich dataset (60 variables) captures meaningful signal for hospital readmission risk  
+
+---
+
+
 ## 🧱 Project Structure
 
 hospital_readmission_forecasting/
