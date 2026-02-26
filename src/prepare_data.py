@@ -11,9 +11,9 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-# ============================================================
+
 # CONFIG (RELATIVE PATHS)
-# ============================================================
+
 # find project root dynamically (relative paths for location independent functionality)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -36,26 +36,21 @@ READMISSION_METRICS = [
 # log confirmation of start of pipeline execution
 print("🔧 Rebuilding analytic dataset from raw sources")
 
-# ============================================================
-# LOAD DATA -> read CSV's into pandas DF
-# ============================================================
 
+# LOAD DATA -> read CSV's into pandas DF
 readm_df = pd.read_csv(READMISSIONS_FILE)
 infect_df = pd.read_csv(INFECTIONS_FILE)
 adi_df    = pd.read_csv(ADI_FILE)
 
-# ============================================================
-# CANONICAL KEY NORMALIZATION -> force Facility ID into string
-# ============================================================
 
+# CANONICAL KEY NORMALIZATION -> force Facility ID into string
 readm_df["Facility ID"] = readm_df["Facility ID"].astype(str)
 infect_df["Facility ID"] = infect_df["Facility ID"].astype(str)
 # normalize ZIP into 5 digit strings for reliable ZIP/ADI join
 infect_df["ZIP Code"] = infect_df["ZIP Code"].astype(str).str.zfill(5)
 
-# ============================================================
+
 # CLEAN READMISSIONS DATA
-# ============================================================
 # create working copy
 readm = readm_df.copy()
 
@@ -91,9 +86,7 @@ readm_pivot = readm_pivot.reset_index()
 # check for facility ID pipeline corruption
 assert "Facility ID" in readm_pivot.columns, "Facility ID missing after pivot"
 
-# ============================================================
 # CLEAN INFECTIONS DATA
-# ============================================================
 # working copy
 infect = infect_df.copy()
 
@@ -119,9 +112,7 @@ infect_pivot = infect.pivot_table(
 # prep for merge
 infect_pivot = infect_pivot.reset_index()
 
-# ============================================================
 # CLEAN ADI DATA 
-# ============================================================
 # improve column readability
 adi = adi_df.rename(columns={
     "ZIP_4": "zip",
@@ -153,9 +144,8 @@ assert adi_zip[["adi_national", "adi_state"]].apply(
     lambda s: np.issubdtype(s.dtype, np.number)
 ).all(), "ADI aggregation produced non-numeric output"
 
-# ============================================================
+
 # FACILITY → ZIP → ADI BRIDGE
-# ============================================================
 # build facility to ZIP lookup table
 facility_zip = (
     infect_df[["Facility ID", "ZIP Code"]]
@@ -174,9 +164,8 @@ facility_adi = facility_zip.merge(
 
 assert "Facility ID" in facility_adi.columns, "Facility ID missing in facility_adi"
 
-# ============================================================
+
 # FINAL ANALYTIC TABLE -> readmissions + infections +SES data
-# ============================================================
 # create merged ML ready DF
 final_df = (
     readm_pivot
@@ -188,9 +177,7 @@ final_df = (
     )
 )
 
-# ============================================================
 # TARGET CONSTRUCTION
-# ============================================================
 # identify excess readmission metrics
 excess_cols = [
     c for c in final_df.columns
@@ -199,9 +186,7 @@ excess_cols = [
 # create model target, AVE excess readmission
 final_df["composite_readmission_score"] = final_df[excess_cols].mean(axis=1)
 
-# ============================================================
 # FINAL VALIDATION -> raise error if key columns missing
-# ============================================================
 
 REQUIRED_COLUMNS = {
     "Facility ID",
@@ -213,10 +198,8 @@ missing = REQUIRED_COLUMNS - set(final_df.columns)
 if missing:
     raise ValueError(f"Missing required columns in final dataset: {missing}")
 
-# ============================================================
-# SAVE OUTPUT, write analytic dataset to disk, report size
-# ============================================================
 
+# SAVE OUTPUT, write analytic dataset to disk, report size
 final_df.to_csv(OUTPUT_FILE, index=False)
 
 print(f"✅ Analytic dataset saved: {OUTPUT_FILE.resolve()}")
