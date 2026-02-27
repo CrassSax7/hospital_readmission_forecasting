@@ -88,10 +88,10 @@ All data are publicly available:
 - Feature-rich dataset (60 variables) captures meaningful signal for hospital readmission risk  
 
 ---
+```markdown
+## 📁 Repository Structure
 
-
-## 🧱 Project Structure
-
+```text
 hospital_readmission_forecasting/
 │
 ├── data/
@@ -111,7 +111,7 @@ hospital_readmission_forecasting/
 │
 ├── requirements.txt
 └── README.md
-
+```
 ---
 
 ## 🚀 How to Run (Mac)
